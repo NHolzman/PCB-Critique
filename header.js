@@ -8,10 +8,23 @@ if (!document.querySelector('style[data-site-header-css]')) {
 
 class SiteHeader extends HTMLElement {
     connectedCallback() {
-        // If already rendered statically (SSR / pre-rendered in HTML), do not re-render
+        // If child elements already exist synchronously (e.g. pre-rendered or injected via PJAX)
         if (this.querySelector('header') && this.querySelector('nav')) {
             return;
         }
+
+        // When streaming static HTML, connectedCallback fires at the opening <site-header> tag
+        // before the parser appends its children. Deferring ensures the parser finishes
+        // attaching the pre-rendered elements before we check if fallback rendering is needed.
+        setTimeout(() => {
+            if (this.querySelector('header') && this.querySelector('nav')) {
+                return;
+            }
+            this.render();
+        }, 0);
+    }
+
+    render() {
 
         // Detect relative root path based on the script's src attribute
         let root = this.getAttribute('root');
