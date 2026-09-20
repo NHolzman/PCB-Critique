@@ -1,10 +1,18 @@
-// Inject display: block for the custom element
-const style = document.createElement('style');
-style.textContent = 'site-header { display: block; }';
-document.head.appendChild(style);
+// Ensure site-header is display: block
+if (!document.querySelector('style[data-site-header-css]')) {
+    const style = document.createElement('style');
+    style.setAttribute('data-site-header-css', '');
+    style.textContent = 'site-header { display: block; }';
+    document.head.appendChild(style);
+}
 
 class SiteHeader extends HTMLElement {
     connectedCallback() {
+        // If already rendered statically (SSR / pre-rendered in HTML), do not re-render
+        if (this.querySelector('header') && this.querySelector('nav')) {
+            return;
+        }
+
         // Detect relative root path based on the script's src attribute
         let root = this.getAttribute('root');
         if (root === null) {
@@ -39,10 +47,12 @@ if (!customElements.get('site-header')) {
 }
 
 /* ==========================================================================
-   McMaster-Carr Style Predictive Preloading Engine
+   McMaster-Carr Style Instant Navigation & Predictive Preloading Engine
    - Speculation Rules API: Native 0ms prerender / prefetch on modern browsers
    - Predictive Hover Debounce (65ms): Prefetches pages when cursor hovers
    - Instant Pointerdown / Touch: Prefetches immediately on tap/mousedown
+   - In-memory Page Cache: Instant retrieval for repeat navigations
+   - Instant PJAX Swapping: Swaps content seamlessly without reloading header
    - Bandwidth awareness: Respects Save-Data & slow 2G connections
    ========================================================================== */
 
@@ -74,15 +84,15 @@ if (typeof HTMLScriptElement !== 'undefined' && HTMLScriptElement.supports && HT
                         { not: { selector_matches: '[rel~="external"], [target="_blank"], [data-no-prefetch]' } }
                     ]
                 },
-                eagerness: 'conservative'
+                eagerness: 'moderate'
             }
         ]
     });
     document.head.appendChild(specScript);
 }
 
-// 2. Universal Predictive Hover & Pointer Preloader (Safari, Firefox, All browsers)
-(function initPredictivePreloader() {
+// 2. Universal Predictive Preloader & Instant Navigation (PJAX)
+(function initMcMasterEngine() {
     // Respect user bandwidth conservation preferences
     const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     if (connection && (connection.saveData || (connection.effectiveType || '').includes('2g'))) {
@@ -90,13 +100,14 @@ if (typeof HTMLScriptElement !== 'undefined' && HTMLScriptElement.supports && HT
     }
 
     const prefetchedUrls = new Set();
+    const pageCache = new Map();
     let hoverTimer = null;
     const HOVER_DELAY_MS = 65; // Debounce to prevent wasted requests during fast cursor sweeps
 
     function isEligibleLink(anchor) {
         if (!anchor || anchor.tagName !== 'A') return false;
         const rawHref = anchor.getAttribute('href');
-        if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('javascript:') || 
+        if (!rawHref || rawHref === '#' || rawHref.startsWith('javascript:') || 
             rawHref.startsWith('mailto:') || rawHref.startsWith('tel:')) {
             return false;
         }
@@ -132,9 +143,17 @@ if (typeof HTMLScriptElement !== 'undefined' && HTMLScriptElement.supports && HT
         link.as = 'document';
         document.head.appendChild(link);
 
-        // Fetch fallback with low priority
+        // Fetch into in-memory cache for instant client swap
         if (window.fetch && window.location.protocol !== 'file:') {
-            fetch(url, { priority: 'low', cache: 'force-cache' }).catch(() => {});
+            fetch(url, { priority: 'low', cache: 'force-cache' })
+                .then(res => {
+                    if (res.ok) return res.text();
+                    throw new Error('Prefetch failed');
+                })
+                .then(html => {
+                    pageCache.set(url, html);
+                })
+                .catch(() => {});
         }
     }
 
@@ -163,11 +182,95 @@ if (typeof HTMLScriptElement !== 'undefined' && HTMLScriptElement.supports && HT
         prefetchUrl(anchor.href);
     }
 
-    // Passive event listeners for zero scroll/render lag
+    // 3. Instant Client Navigation (PJAX) for Same-Origin HTTP/HTTPS
+    async function loadPage(url, push = true) {
+        try {
+            let html = pageCache.get(url);
+            if (!html) {
+                const res = await fetch(url, { cache: 'force-cache' });
+                if (!res.ok) throw new Error('Fetch failed');
+                html = await res.text();
+                pageCache.set(url, html);
+            }
+
+            const parser = new DOMParser();
+            const newDoc = parser.parseFromString(html, 'text/html');
+
+            // 1. Update Title
+            if (newDoc.title) {
+                document.title = newDoc.title;
+            }
+
+            // 2. Synchronize <site-header> links to match destination context
+            const newHeader = newDoc.querySelector('site-header');
+            const curHeader = document.querySelector('site-header');
+            if (newHeader && curHeader) {
+                curHeader.innerHTML = newHeader.innerHTML;
+                if (newHeader.hasAttribute('root')) {
+                    curHeader.setAttribute('root', newHeader.getAttribute('root'));
+                } else {
+                    curHeader.removeAttribute('root');
+                }
+            }
+
+            // 3. Swap #content-wrapper
+            const newContent = newDoc.querySelector('#content-wrapper');
+            const curContent = document.querySelector('#content-wrapper');
+            if (newContent && curContent) {
+                curContent.replaceWith(newContent);
+            }
+
+            // 4. Update History
+            if (push) {
+                history.pushState({ url }, '', url);
+            }
+
+            // 5. Scroll to top or anchor
+            const targetUrlObj = new URL(url, window.location.href);
+            if (targetUrlObj.hash) {
+                const targetEl = document.querySelector(targetUrlObj.hash);
+                if (targetEl) {
+                    targetEl.scrollIntoView();
+                } else {
+                    window.scrollTo(0, 0);
+                }
+            } else {
+                window.scrollTo(0, 0);
+            }
+        } catch {
+            // Graceful fallback to native navigation
+            window.location.href = url;
+        }
+    }
+
+    function onLinkClick(event) {
+        // Respect modifier keys (Ctrl+click, Cmd+click, Shift+click, middle click)
+        if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) {
+            return;
+        }
+
+        // On file:// protocol, fetch is blocked by CORS, so let native navigation handle it
+        if (window.location.protocol === 'file:') {
+            return;
+        }
+
+        const anchor = event.target.closest('a');
+        if (!anchor || !isEligibleLink(anchor)) return;
+
+        event.preventDefault();
+        loadPage(anchor.href, true);
+    }
+
+    window.addEventListener('popstate', () => {
+        if (window.location.protocol !== 'file:') {
+            loadPage(window.location.href, false);
+        }
+    });
+
+    // Event listeners
+    document.addEventListener('click', onLinkClick);
     document.addEventListener('pointerover', onPointerOver, { passive: true });
     document.addEventListener('pointerout', onPointerOut, { passive: true });
     document.addEventListener('pointerdown', onPointerDown, { passive: true });
     document.addEventListener('touchstart', onPointerDown, { passive: true });
 })();
-
-
