@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>The Official Journal of Record - Critiques Portal</title>
     <style>
         /* 2010s Utilitarian Layout Styles - Scaled Up View */
@@ -14,9 +15,26 @@
             margin: 0;
             padding: 0;
         }
-        
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        img,
+        video,
+        iframe {
+            max-width: 100%;
+            height: auto;
+        }
+
         #container {
-            width: 1050px;
+            width: min(1050px, 100%);
             margin: 0 auto;
             background-color: #ffffff;
             border-left: 2px solid #000000;
@@ -143,6 +161,67 @@
             padding: 18px;
             font-size: 12px;
             border-top: 2px solid #000000;
+        }
+
+        .post-content,
+        .post-content p,
+        .post-content li {
+            overflow-wrap: anywhere;
+        }
+
+        @media (max-width: 700px) {
+            header {
+                padding: 18px 14px;
+            }
+
+            header h1 {
+                font-size: clamp(20px, 7vw, 28px);
+                line-height: 1.2;
+                letter-spacing: 0;
+            }
+
+            header p {
+                line-height: 1.4;
+            }
+
+            nav {
+                padding: 10px 14px;
+            }
+
+            nav a {
+                display: inline-block;
+                margin: 3px 12px 3px 0;
+            }
+
+            #content-wrapper {
+                display: block;
+            }
+
+            main,
+            aside {
+                display: block;
+                width: 100%;
+                padding: 18px 14px;
+            }
+
+            aside {
+                border-left: 0;
+                border-top: 1px solid #999999;
+            }
+
+            .post {
+                margin-bottom: 24px;
+                padding-bottom: 18px;
+            }
+
+            .post-title {
+                font-size: 20px;
+                line-height: 1.3;
+            }
+
+            footer {
+                padding: 14px;
+            }
         }
     </style>
     <script src="../header.js"></script>
