@@ -14,7 +14,7 @@ class SiteHeader extends HTMLElement {
                 <p>Associated with the pro nuclear energy committee &bull; Established in 2026</p>
             </header>
             <nav>
-                <a href="${root}index.html">[Home]</a>
+                <a href="${root}">[Home]</a>
                 <a href="#">[Archive]</a>
                 <a href="${root}documentation/">[Documentation]</a>
                 <a href="${root}critiques/">[Critiques]</a>
