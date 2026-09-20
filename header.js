@@ -198,6 +198,15 @@ if (typeof HTMLScriptElement !== 'undefined' && HTMLScriptElement.supports && HT
                 document.title = newDoc.title;
             }
 
+            // ADD IT RIGHT HERE (with the closing brace added!):
+            if (!document.querySelector("link[rel='icon']")) {
+                const favicon = document.createElement('link');
+                favicon.rel = 'icon';
+                favicon.type = 'image/x-icon';
+                favicon.href = '../favicon.ico'; // Adjust path if needed
+                document.head.appendChild(favicon);
+            }
+
             // 2. Synchronize <site-header> links to match destination context using single-source template
             const newHeader = newDoc.querySelector('site-header');
             const curHeader = document.querySelector('site-header');
