@@ -203,8 +203,8 @@ if (typeof HTMLScriptElement !== 'undefined' && HTMLScriptElement.supports && HT
                 const favicon = document.createElement('link');
                 favicon.rel = 'icon';
                 favicon.type = 'image/x-icon';
-                favicon.href = '../favicon.ico'; // Adjust path if needed
-                document.head.appendChild(favicon);
+                favicon.href = '/favicon.ico'; // <- Use a root-relative path
+                document.head.appendChild(favicon); // (Also note: make sure it's appendChild(favicon), not 'link')
             }
 
             // 2. Synchronize <site-header> links to match destination context using single-source template
