@@ -28,7 +28,7 @@ class SiteHeader extends HTMLElement {
                 <a href="${root}documentation/index.html">[Documentation]</a>
                 <a href="${root}critiques/index.html">[Critiques]</a>
                 <a href="#">[Contact]</a>
-                <a href="https://pronucleaire.org" target="_blank" rel="noopener noreferrer">[Comité pro énergie nucléaire]</a>
+                <a href="https://pronucleaire.org" target="_blank" rel="noopener noreferrer">[Comité pro énergie nucléaire ↗]</a>
             </nav>
         `;
     }
