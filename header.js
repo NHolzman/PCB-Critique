@@ -7,26 +7,24 @@ if (!document.querySelector('style[data-site-header-css]')) {
 }
 
 class SiteHeader extends HTMLElement {
-    connectedCallback() {
-        // If child elements already exist synchronously (e.g. pre-rendered or injected via PJAX)
-        if (this.querySelector('header') && this.querySelector('nav')) {
-            return;
-        }
-
-        // When streaming static HTML, connectedCallback fires at the opening <site-header> tag
-        // before the parser appends its children. Deferring ensures the parser finishes
-        // attaching the pre-rendered elements before we check if fallback rendering is needed.
-        setTimeout(() => {
-            if (this.querySelector('header') && this.querySelector('nav')) {
-                return;
-            }
-            this.render();
-        }, 0);
+    static getHTML(root = '') {
+        return `
+            <header>
+                <h1>The website to critique PCBs</h1>
+                <p>Associated with the pro nuclear energy committee &bull; Established in 2026</p>
+            </header>
+            <nav>
+                <a href="${root}index.html">[Home]</a>
+                <a href="#">[Archive]</a>
+                <a href="${root}documentation/index.html">[Documentation]</a>
+                <a href="${root}critiques/index.html">[Critiques]</a>
+                <a href="${root}contact/index.html">[Contact]</a>
+                <a href="https://pronucleaire.org" target="_blank" rel="noopener noreferrer">[Comité pro énergie nucléaire ↗]</a>
+            </nav>
+        `;
     }
 
-    render() {
-
-        // Detect relative root path based on the script's src attribute
+    connectedCallback() {
         let root = this.getAttribute('root');
         if (root === null) {
             const script = document.querySelector('script[src*="header.js"]');
@@ -37,21 +35,7 @@ class SiteHeader extends HTMLElement {
                 root = '';
             }
         }
-
-        this.innerHTML = `
-            <header>
-                <h1>The website to critique PCBs</h1>
-                <p>Associated with the pro nuclear energy committee &bull; Established in 2026</p>
-            </header>
-            <nav>
-                <a href="${root}index.html">[Home]</a>
-                <a href="#">[Archive]</a>
-                <a href="${root}documentation/index.html">[Documentation]</a>
-                <a href="${root}critiques/index.html">[Critiques]</a>
-                <a href="#">[Contact]</a>
-                <a href="https://pronucleaire.org" target="_blank" rel="noopener noreferrer">[Comité pro énergie nucléaire ↗]</a>
-            </nav>
-        `;
+        this.innerHTML = SiteHeader.getHTML(root);
     }
 }
 
@@ -214,16 +198,17 @@ if (typeof HTMLScriptElement !== 'undefined' && HTMLScriptElement.supports && HT
                 document.title = newDoc.title;
             }
 
-            // 2. Synchronize <site-header> links to match destination context
+            // 2. Synchronize <site-header> links to match destination context using single-source template
             const newHeader = newDoc.querySelector('site-header');
             const curHeader = document.querySelector('site-header');
-            if (newHeader && curHeader) {
-                curHeader.innerHTML = newHeader.innerHTML;
-                if (newHeader.hasAttribute('root')) {
-                    curHeader.setAttribute('root', newHeader.getAttribute('root'));
+            if (curHeader) {
+                const targetRoot = newHeader ? (newHeader.getAttribute('root') || '') : '';
+                if (targetRoot) {
+                    curHeader.setAttribute('root', targetRoot);
                 } else {
                     curHeader.removeAttribute('root');
                 }
+                curHeader.innerHTML = SiteHeader.getHTML(targetRoot);
             }
 
             // 3. Swap #content-wrapper
