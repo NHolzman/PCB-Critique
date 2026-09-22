@@ -15,6 +15,7 @@ class SiteHeader extends HTMLElement {
             </header>
             <nav>
                 <a href="${root}">[Home]</a>
+                <a href="${root}archive/">[Archive]</a>
                 <a href="#">[Archive]</a>
                 <a href="${root}documentation/">[Documentation]</a>
                 <a href="${root}critiques/">[Critiques]</a>
