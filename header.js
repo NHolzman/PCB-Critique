@@ -44,12 +44,7 @@ if (!customElements.get('site-header')) {
 
 /* ==========================================================================
    McMaster-Carr Style Instant Navigation & Predictive Preloading Engine
-   - Speculation Rules API: Native 0ms prerender / prefetch on modern browsers
-   - Predictive Hover Debounce (65ms): Prefetches pages when cursor hovers
-   - Instant Pointerdown / Touch: Prefetches immediately on tap/mousedown
-   - In-memory Page Cache: Instant retrieval for repeat navigations
-   - Instant PJAX Swapping: Swaps content seamlessly without reloading header
-   - Bandwidth awareness: Respects Save-Data & slow 2G connections
+   + Automatic Markdown (.md) Client-Side Renderer for /critiques/
    ========================================================================== */
 
 // 1. Speculation Rules API (Chrome / Edge / modern Chromium)
@@ -146,11 +141,46 @@ if (typeof HTMLScriptElement !== 'undefined' && HTMLScriptElement.supports && HT
                     if (res.ok) return res.text();
                     throw new Error('Prefetch failed');
                 })
-                .then(html => {
+                .then(rawText => {
+                    let html = rawText;
+                    // Auto-parse markdown if it's a .md file
+                    if (url.toLowerCase().endsWith('.md')) {
+                        html = convertMarkdownToHtmlPage(rawText, url);
+                    }
                     pageCache.set(url, html);
                 })
                 .catch(() => {});
         }
+    }
+
+    function convertMarkdownToHtmlPage(rawText, url) {
+        const parsedContent = typeof marked !== 'undefined' ? marked.parse(rawText) : `<pre>${rawText}</pre>`;
+        
+        // Extract title from first H1 if available, otherwise fallback to filename
+        const titleMatch = rawText.match(/^#\s+(.+)$/m);
+        const fileName = url.substring(url.lastIndexOf('/') + 1).replace('.md', '');
+        const pageTitle = titleMatch ? `${titleMatch[1]} — PCB Critiques` : `${fileName} — PCB Critiques`;
+
+        // Determine correct root path for header relative depth
+        // If inside /critiques/, root relative path is '../'
+        const depth = url.split('/').filter(Boolean).length;
+        const rootPath = depth > 1 ? '../' : '';
+
+        return `<!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>${pageTitle}</title>
+        </head>
+        <body>
+            <site-header root="${rootPath}"></site-header>
+            <main id="content-wrapper">
+                <article class="markdown-content" style="max-width: 800px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6;">
+                    ${parsedContent}
+                </article>
+            </main>
+        </body>
+        </html>`;
     }
 
     function onPointerOver(event) {
@@ -174,18 +204,23 @@ if (typeof HTMLScriptElement !== 'undefined' && HTMLScriptElement.supports && HT
     function onPointerDown(event) {
         const anchor = event.target.closest('a');
         if (!anchor || !isEligibleLink(anchor)) return;
-        // Preload immediately on touch or mouse down to utilize the 100-300ms click delay
         prefetchUrl(anchor.href);
     }
 
-    // 3. Instant Client Navigation (PJAX) for Same-Origin HTTP/HTTPS
+    // 3. Instant Client Navigation (PJAX) with Markdown support
     async function loadPage(url, push = true) {
         try {
             let html = pageCache.get(url);
             if (!html) {
                 const res = await fetch(url, { cache: 'force-cache' });
                 if (!res.ok) throw new Error('Fetch failed');
-                html = await res.text();
+                const rawText = await res.text();
+
+                if (url.toLowerCase().endsWith('.md')) {
+                    html = convertMarkdownToHtmlPage(rawText, url);
+                } else {
+                    html = rawText;
+                }
                 pageCache.set(url, html);
             }
 
@@ -197,16 +232,7 @@ if (typeof HTMLScriptElement !== 'undefined' && HTMLScriptElement.supports && HT
                 document.title = newDoc.title;
             }
 
-            // ADD IT RIGHT HERE (with the closing brace added!):
-            if (!document.querySelector("link[rel='icon']")) {
-                const favicon = document.createElement('link');
-                favicon.rel = 'icon';
-                favicon.type = 'image/x-icon';
-                favicon.href = '/favicon.ico'; // <- Use a root-relative path
-                document.head.appendChild(favicon); // (Also note: make sure it's appendChild(favicon), not 'link')
-            }
-
-            // 2. Synchronize <site-header> links to match destination context using single-source template
+            // 2. Synchronize <site-header> links
             const newHeader = newDoc.querySelector('site-header');
             const curHeader = document.querySelector('site-header');
             if (curHeader) {
@@ -250,12 +276,9 @@ if (typeof HTMLScriptElement !== 'undefined' && HTMLScriptElement.supports && HT
     }
 
     function onLinkClick(event) {
-        // Respect modifier keys (Ctrl+click, Cmd+click, Shift+click, middle click)
         if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) {
             return;
         }
-
-        // On file:// protocol, fetch is blocked by CORS, so let native navigation handle it
         if (window.location.protocol === 'file:') {
             return;
         }
